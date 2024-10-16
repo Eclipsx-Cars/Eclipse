@@ -1,0 +1,10 @@
+/* Adjust main content padding */
+.SizeScreen {
+    margin-left: 250px; /* This matches the sidebar's full width */
+    transition: margin-left 0.3s ease;
+}
+
+/* When the sidebar is collapsed */
+.sidebar.collapsed ~ .SizeScreen {
+    margin-left: 60px; /* Adjust this value to match the collapsed sidebar width */
+}

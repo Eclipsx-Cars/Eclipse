@@ -1,0 +1,25 @@
+.flex-box {
+    display: flex;
+    flex-direction: column;
+    min-height: 80vh; /* Full height of viewport */
+}
+
+main {
+    flex-grow: 1;
+}
+
+/* Ensures the footer sticks to the bottom */
+.admin-panel-container {
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Full viewport height */
+}
+
+.main-content {
+    flex: 1; /* Takes up all available space, pushing the footer down */
+}
+
+.footer-container {
+    flex-shrink: 0; /* Ensures the footer doesn't shrink */
+}

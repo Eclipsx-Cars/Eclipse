@@ -1,0 +1,30 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: "Bebas Neue", cursive;
+  margin: 0;
+  padding: 0;
+}
+
+@layer components {
+  .grid-rows-layout {
+    grid-template-rows: auto 1fr auto;
+  }
+  .row-content {
+    min-height: 0;
+  }
+}
+
+.fc-toolbar-title {
+  color: white;
+}
+
+.fc-daygrid-day-number {
+  color: white;
+}
+.fc-daygrid-day-top {
+  color: white;
+}
