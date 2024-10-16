@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "install-server": "cd rentacarbackend-main && npm install",
-    "start-server": "cd rentacarbackend-main && node index.js",
+    "start-server": "cd rentacarbackend-main && node server.js",
     "install-client": "cd rentacar-main && npm install",
     "build-client": "cd rentacar-main && npm run build",
     "start-client": "cd rentacar-main && npm run start"
