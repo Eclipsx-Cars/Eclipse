@@ -14,6 +14,7 @@ const reservationRoutes = require("./routes/reservationRoutes");
 const demoLoginRoutes = require("./routes/demoLogin");
 const jobRoutes = require("./routes/driverJobsRoutes");
 const requestedDriverJobsRouter = require("./routes/requestedDriverJobsRouter");
+const reveiwRoute = require("./routes/reveiwRoute")
 
 // Create a new Express application
 const app = express();
@@ -43,6 +44,8 @@ app.use("/api/demo-login", demoLoginRoutes);
 app.use("/api/jobs", jobRoutes);
 //use the requestDriverJobs route
 app.use("/api/requestedDriverJobs", requestedDriverJobsRouter);
+//use the review route
+app.use("/api/reviews", reveiwRoute);
 //info
 app.get("/", (req, res) => {
   res.send(
