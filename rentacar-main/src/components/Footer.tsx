@@ -9,7 +9,7 @@ const Footer = () => {
                     <ul className="flex flex-wrap justify-center items-center mb-4 text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
                         <li className='mx-4'>
                             <a
-                                href="https://github.com/tommimaki/rentacar"
+                                href=""
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mx-4"
@@ -19,7 +19,7 @@ const Footer = () => {
                         </li>
                         <li className='mx-4'>
                             <a
-                                href="https://www.linkedin.com/in/tommi-maki/"
+                                href=""
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mx-4"
@@ -32,7 +32,7 @@ const Footer = () => {
                         </li>
                         <li className='mx-4'>
                             <a
-                                href="https://tommimaki.com/"
+                                href=""
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mx-4"
