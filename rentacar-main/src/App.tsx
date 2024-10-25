@@ -18,6 +18,7 @@ import AdminRouter from "./AdminRouter";
 import RequestDriverJob from "./components/RequestDriverJob";
 import CheckoutPage from "./components/CheckoutPage";
 import PaymentFormPage from "./components/PaymentFormPage";
+import ReviewCarousel from "./components/review";
 
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/Payment" element={<PaymentFormPage />} />
                 <Route path="/demo-login" element={<DemoLogin />} />
                 <Route path="/cars/:carId" element={<CarDetails />} />
+                <Route path="/reviews" element={<ReviewCarousel />} />
               </Routes>
             </div>
           </div>
