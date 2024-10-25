@@ -39,6 +39,9 @@ const LandingPage = () => {
                     </div>
                 </div>
             </div>
+            <About />
+            <ReviewCarousel />
+            <Cars />
         </div>
     );
 };
