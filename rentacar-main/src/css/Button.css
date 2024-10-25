@@ -1,0 +1,20 @@
+.luxury-button {
+    padding: 0.75rem 2rem; /* Larger padding for a luxurious feel */
+    background-color: #1c1c1c; /* Dark elegant background */
+    color: #e3c08d; /* Gold-inspired text color */
+    border: 1px solid #e3c08d; /* Gold border */
+    border-radius: 9999px; /* Fully rounded for a sleek look */
+    font-weight: 600; /* Slightly bold for readability */
+    text-transform: uppercase; /* Give it a modern, bold style */
+    letter-spacing: 1px; /* Space out letters for a premium look */
+    transition: all 0.3s ease; /* Smooth transition for hover effects */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+}
+
+.luxury-button:hover {
+    background-color: #e3c08d; /* Gold background on hover */
+    color: #1c1c1c; /* Text color switches to black on hover */
+    border-color: #1c1c1c; /* Dark border on hover */
+    transform: translateY(-2px); /* Subtle lift on hover */
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2); /* Enhanced shadow on hover */
+}
