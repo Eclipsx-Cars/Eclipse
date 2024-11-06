@@ -36,8 +36,8 @@ const Cars = () => {
 
     return (
         <div>
-            <Header />
             <div className=" px-4 py-12 md:px-12  min-h-screen   md:py-24 bg-gray-100">
+                <Header />
                 <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">Cars</h2>
 
                 <div className="max-w-6xl mx-auto">
