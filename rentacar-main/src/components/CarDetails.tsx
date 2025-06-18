@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import Reservation from './Reservation';
 import Calendar from './Calendar';
@@ -12,7 +12,7 @@ interface Car {
     model: string;
     year: number;
     description: string;
-    price: string;  // Assuming price is a string. If it's a number, change type accordingly.
+    price: string;
     CarForReason: string;
     imageUrl: string;
 }
@@ -21,6 +21,8 @@ const CarDetails = () => {
     const { carId } = useParams<{ carId: string }>();
     const [car, setCar] = useState<Car | null>(null);
     const [updateCalendar, setUpdateCalendar] = useState(false);
+    const [isMultiDay, setIsMultiDay] = useState(true);
+    const reservationRef = useRef<any>(null);
 
     useEffect(() => {
         const fetchCar = async () => {
@@ -41,10 +43,19 @@ const CarDetails = () => {
         setUpdateCalendar(prevState => !prevState);
     };
 
-    // Determine price per hour or per 6 hours based on CarForReason
+    const handleCalendarDateSelect = (start: string, end: string) => {
+        if (reservationRef.current) {
+            reservationRef.current.handleDateSelection(start, end);
+        }
+    };
+
+    const handleMultiDayChange = (isMultiDay: boolean) => {
+        setIsMultiDay(isMultiDay);
+    };
+
     const pricePerHour = car.CarForReason === "chauffeur"
-        ? (Number(car.price) / 6).toFixed(2) // Dividing price by 6 hours for chauffeur
-        : car.price; // Regular price per hour
+        ? (Number(car.price) / 6).toFixed(2)
+        : car.price;
 
     return (
         <div>
@@ -67,19 +78,26 @@ const CarDetails = () => {
                     </div>
                 </div>
             </div>
-            <div className="flex flex-col md:flex-row bg-gray-900">
-                <div className="flex-grow md:mr-4">
+            <div className="flex flex-col md:flex-row bg-gray-900 p-4 gap-4">
+                <div className="flex-1">
                     <Reservation
+                        ref={reservationRef}
                         carId={carId || ""}
-                        pricePerDay={Number(car.price)} // Assuming this is used elsewhere as total price for day reservation
+                        pricePerDay={Number(car.price)}
                         onReservationSuccess={handleReservationSuccess}
                         carMake={car.make}
                         carModel={car.model}
                         carForReason={car.CarForReason}
+                        onCalendarDateSelect={handleMultiDayChange}
                     />
                 </div>
-                <div className="flex-grow md:ml-4">
-                    <Calendar carId={carId || ""} updateCalendar={updateCalendar} />
+                <div className="flex-1">
+                    <Calendar
+                        carId={carId || ""}
+                        updateCalendar={updateCalendar}
+                        isMultiDay={isMultiDay}
+                        onDateSelect={handleCalendarDateSelect}
+                    />
                 </div>
             </div>
             <Footer />

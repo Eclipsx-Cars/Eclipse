@@ -72,8 +72,8 @@ const ReservationList: React.FC<ReservationListProps> = ({ reservations }) => {
                             End Date: {new Date(reservation.endDate).toISOString().slice(0, 10)}
                             {reservation.endTime ? ` at ${reservation.endTime}` : ''}
                         </p>
-                        <p className="mb-2">Total Price: {`${reservation.totalPrice.toFixed(2)}€`}</p>
-                        <p className="mb-2">Remaining to Pay: {`${reservation.remainingToPay.toFixed(2)}€`}</p>
+                        <p className="mb-2">Total Price: £{`${reservation.totalPrice.toFixed(2)}`}</p>
+                        <p className="mb-2">Remaining to Pay: £{`${reservation.remainingToPay.toFixed(2)}`}</p>
                         <p className={`mb-2 ${reservation.remainingToPay === 0 ? 'text-green-500' : 'text-red-500'}`}>
                             Status: {reservation.remainingToPay === 0 ? 'Paid' : 'Unpaid'}
                         </p>

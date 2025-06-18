@@ -4,6 +4,7 @@ import AdminPanel from "./components/AdminPanel";
 import DriverJobPage from "./components/DriverJobPage";
 import RentalCarsPage from "./components/RentalCarsPage";
 import UserPage from "./components/UserPage";
+import Messages from "./components/Messages";
 
 
 const AdminRouter: React.FC = () => {
@@ -13,6 +14,7 @@ const AdminRouter: React.FC = () => {
             <Route path="/Driverjobs" element={<DriverJobPage />} />
             <Route path ="/Rentalcars" element={<RentalCarsPage />} />
             <Route path ="/Userpage" element={<UserPage />} />
+            <Route path ="/Messages" element={<Messages />} />
         </Routes>
     );
 };

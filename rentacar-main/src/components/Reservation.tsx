@@ -1,29 +1,60 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+import React, { useState, useContext, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/authContext';
-import { useNavigate } from 'react-router-dom'; // To redirect on "continue"
+import { useNavigate } from 'react-router-dom';
 
 interface ReservationProps {
     carId: string;
     carMake: string;
     carModel: string;
     pricePerDay: number;
-    carForReason: string; // New prop to get the reason for the car
+    carForReason: string;
     onReservationSuccess: () => void;
+    onCalendarDateSelect?: (isMultiDay: boolean) => void;
 }
 
-function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carModel, carForReason }: ReservationProps) {
+const Reservation = forwardRef(({
+                                    carId,
+                                    pricePerDay,
+                                    onReservationSuccess,
+                                    carMake,
+                                    carModel,
+                                    carForReason,
+                                    onCalendarDateSelect
+                                }: ReservationProps, ref) => {
     const { userId } = useContext(AuthContext);
-    const [isMultiDay, setIsMultiDay] = useState(true); // State for radio button selection
+    const [isMultiDay, setIsMultiDay] = useState(true);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [startTime, setStartTime] = useState(''); // New state for start time
-    const [endTime, setEndTime] = useState(''); // New state for end time
-    const [totalPrice, setTotalPrice] = useState('0.00'); // Initialize to '0.00'
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
+    const [totalPrice, setTotalPrice] = useState('0.00');
     const [reservations, setReservations] = useState([]);
     const [errorMessage, setErrorMessage] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false); // State for modal
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
+
+    const [fieldErrors, setFieldErrors] = useState({
+        startDate: false,
+        endDate: false,
+        startTime: false,
+        endTime: false
+    });
+
+    useImperativeHandle(ref, () => ({
+        handleDateSelection: (start: string, end: string) => {
+            setStartDate(start);
+            if (isMultiDay) {
+                setEndDate(end);
+            }
+        }
+    }));
+
+    useEffect(() => {
+        if (onCalendarDateSelect) {
+            onCalendarDateSelect(isMultiDay);
+        }
+    }, [isMultiDay, onCalendarDateSelect]);
 
     useEffect(() => {
         const fetchReservations = async () => {
@@ -31,8 +62,6 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
                 const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/reservations/car/${carId}`);
                 if (response.status === 200) {
                     setReservations(response.data);
-                } else {
-                    console.error('Error fetching reservations:', response.data);
                 }
             } catch (error) {
                 console.error('Error fetching reservations:', error);
@@ -43,12 +72,12 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
 
     const hasConflictingReservation = () => {
         const newStart = isMultiDay
-            ? new Date(`${startDate}T00:00:00`) // Start of the day for multi-day reservations
-            : new Date(`${startDate}T${startTime}`); // Specific time for single-day
+            ? new Date(`${startDate}T00:00:00`)
+            : new Date(`${startDate}T${startTime}`);
 
         const newEnd = isMultiDay
-            ? new Date(`${endDate}T23:59:59`) // End of the last day for multi-day
-            : new Date(`${startDate}T${endTime}`); // Specific time for single-day
+            ? new Date(`${endDate}T23:59:59`)
+            : new Date(`${startDate}T${endTime}`);
 
         return reservations.some((reservation: any) => {
             const existingStart = new Date(reservation.startDate);
@@ -60,27 +89,34 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
         });
     };
 
-    // Memoize the calculateTotalPrice function using useCallback
     const calculateTotalPrice = useCallback(() => {
+        if (!startDate || (isMultiDay && !endDate) || (!isMultiDay && (!startTime || !endTime))) {
+            return '0.00';
+        }
+
         if (isMultiDay) {
             const start = new Date(startDate);
             const end = new Date(endDate);
-            const days = (end.getTime() - start.getTime()) / (1000 * 3600 * 24) + 1; // Add one to include the end day
-            return (days * pricePerDay).toFixed(2); // Return total price rounded to 2 decimal places
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+            return (days * pricePerDay).toFixed(2);
         } else {
             const start = new Date(`${startDate}T${startTime}`);
             const end = new Date(`${startDate}T${endTime}`);
             const hours = (end.getTime() - start.getTime()) / (1000 * 3600);
 
+            if (hours <= 0) {
+                return '0.00';
+            }
+
             if (carForReason === "MusicVideo" && hours < 2) {
-                setErrorMessage("Minimum booking time for Music Video is 2 hours."); // Set error message
-                return '0.00'; // Error: minimum 2 hours for MusicVideo
+                setErrorMessage("Minimum booking time for Music Video is 2 hours.");
+                return '0.00';
             }
             if (carForReason === "Chauffeur" && hours < 6) {
-                setErrorMessage("Minimum booking time for Chauffeur is 6 hours."); // Set error message
-                return '0.00'; // Error: minimum 6 hours for Chauffeur
+                setErrorMessage("Minimum booking time for Chauffeur is 6 hours.");
+                return '0.00';
             }
-            // Adjust pricing based on car type and round to 2 decimal places
+
             return (hours * (carForReason === "Chauffeur" ? pricePerDay / 6 : pricePerDay)).toFixed(2);
         }
     }, [isMultiDay, startDate, endDate, startTime, endTime, pricePerDay, carForReason]);
@@ -89,51 +125,140 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
         setTotalPrice(calculateTotalPrice());
     }, [startDate, endDate, startTime, endTime, calculateTotalPrice]);
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    const validateForm = (): boolean => {
+        const errors = {
+            startDate: false,
+            endDate: false,
+            startTime: false,
+            endTime: false
+        };
+        let isValid = true;
+
+        setErrorMessage('');
 
         if (!userId) {
             setErrorMessage('You must be logged in to rent a car.');
-            return;
+            isValid = false;
         }
+
+        if (!startDate) {
+            errors.startDate = true;
+            setErrorMessage('Please select a start date');
+            isValid = false;
+        }
+
+        if (isMultiDay && !endDate) {
+            errors.endDate = true;
+            setErrorMessage('Please select an end date');
+            isValid = false;
+        }
+
+        if (!isMultiDay) {
+            if (!startTime) {
+                errors.startTime = true;
+                setErrorMessage('Please select a start time');
+                isValid = false;
+            }
+            if (!endTime) {
+                errors.endTime = true;
+                setErrorMessage('Please select an end time');
+                isValid = false;
+            }
+
+            if (startTime && endTime) {
+                const start = new Date(`${startDate}T${startTime}`);
+                const end = new Date(`${startDate}T${endTime}`);
+                const hours = (end.getTime() - start.getTime()) / (1000 * 3600);
+
+                if (hours <= 0) {
+                    errors.startTime = true;
+                    errors.endTime = true;
+                    setErrorMessage("End time must be after start time");
+                    isValid = false;
+                }
+
+                if (carForReason === "MusicVideo" && hours < 2) {
+                    errors.startTime = true;
+                    errors.endTime = true;
+                    setErrorMessage("Minimum booking time for Music Video is 2 hours.");
+                    isValid = false;
+                }
+                if (carForReason === "Chauffeur" && hours < 6) {
+                    errors.startTime = true;
+                    errors.endTime = true;
+                    setErrorMessage("Minimum booking time for Chauffeur is 6 hours.");
+                    isValid = false;
+                }
+            }
+        }
+
         if (hasConflictingReservation()) {
-            alert('The selected dates are already booked. Please choose different dates.');
-            return;
+            setErrorMessage('The selected dates are already booked. Please choose different dates.');
+            errors.startDate = true;
+            errors.endDate = true;
+            isValid = false;
         }
 
-        // Validate totalPrice to prevent modal from opening if conditions aren't met
-        const calculatedPrice = calculateTotalPrice();
-        if (parseFloat(calculatedPrice) <= 0) {
-            return; // Prevent modal from opening if validation fails
+        setFieldErrors(errors);
+
+        if (!isValid) {
+            setTimeout(() => {
+                const errorElement = document.querySelector('.error-message');
+                if (errorElement) {
+                    errorElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            }, 100);
         }
 
-        setIsModalOpen(true);
+        return isValid;
+    };
+
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (validateForm()) {
+            setIsModalOpen(true);
+        }
     };
 
     const handleCancelModal = () => {
-        setIsModalOpen(false); // Close the modal
+        setIsModalOpen(false);
     };
 
     const handleContinue = () => {
         const depositAmount = (parseFloat(totalPrice) * 0.3).toFixed(2);
-        navigate('/Checkout', { state: { depositAmount, totalPrice, carId, carMake, carModel, startDate, endDate, startTime, endTime } });
-        onReservationSuccess(); // Call the success callback
+        navigate('/Checkout', {
+            state: {
+                depositAmount,
+                totalPrice,
+                carId,
+                carMake,
+                carModel,
+                startDate,
+                endDate,
+                startTime,
+                endTime,
+                isMultiDay
+            }
+        });
+        onReservationSuccess();
     };
-
-    const depositAmount = (parseFloat(totalPrice) * 0.3).toFixed(2);
 
     return (
         <div>
             {errorMessage && (
-                <div className="bg-red-500 text-white p-3 rounded-md mb-4">
+                <div className="error-message bg-red-500 text-black font-semibold p-3 rounded-md mb-4">
                     {errorMessage}
                 </div>
             )}
             <form onSubmit={handleSubmit} className="bg-gray-900 p-6 rounded-lg">
                 <h2 className="text-2xl text-white font-bold mb-4">Create Reservation</h2>
-                <p className="text-xl text-white font-bold mb-4">All reservations cancelled within 48 hours of the start date will be charged the full amount.</p>
+                <p className="text-xl text-white font-bold mb-4">
+                    All reservations cancelled within 48 hours of the start date will be charged the full amount.
+                </p>
 
-                {/* Radio Buttons for Multi-day or Single-day Reservation */}
                 <div className="flex mb-4">
                     <div className="mr-4">
                         <label className="text-white font-bold">
@@ -168,8 +293,10 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
                                 id="start-date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                min={new Date().toISOString().slice(0, 10)}
-                                className="bg-gray-800 rounded-lg py-2 px-3 text-white"
+                                min={new Date().toISOString().split('T')[0]}
+                                className={`bg-gray-800 rounded-lg py-2 px-3 text-white ${
+                                    fieldErrors.startDate ? 'border-2 border-red-500' : ''
+                                }`}
                             />
                         </div>
                         <div className="flex flex-col mb-4">
@@ -182,7 +309,9 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
                                 min={startDate}
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-gray-800 rounded-lg py-2 px-3 text-white"
+                                className={`bg-gray-800 rounded-lg py-2 px-3 text-white ${
+                                    fieldErrors.endDate ? 'border-2 border-red-500' : ''
+                                }`}
                             />
                         </div>
                     </>
@@ -197,8 +326,10 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
                                 id="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                min={new Date().toISOString().slice(0, 10)}
-                                className="bg-gray-800 rounded-lg py-2 px-3 text-white"
+                                min={new Date().toISOString().split('T')[0]}
+                                className={`bg-gray-800 rounded-lg py-2 px-3 text-white ${
+                                    fieldErrors.startDate ? 'border-2 border-red-500' : ''
+                                }`}
                             />
                         </div>
                         <div className="flex flex-col mb-4">
@@ -210,7 +341,9 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
                                 id="start-time"
                                 value={startTime}
                                 onChange={(e) => setStartTime(e.target.value)}
-                                className="bg-gray-800 rounded-lg py-2 px-3 text-white"
+                                className={`bg-gray-800 rounded-lg py-2 px-3 text-white ${
+                                    fieldErrors.startTime ? 'border-2 border-red-500' : ''
+                                }`}
                             />
                         </div>
                         <div className="flex flex-col mb-4">
@@ -222,36 +355,46 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
                                 id="end-time"
                                 value={endTime}
                                 onChange={(e) => setEndTime(e.target.value)}
-                                className="bg-gray-800 rounded-lg py-2 px-3 text-white"
+                                className={`bg-gray-800 rounded-lg py-2 px-3 text-white ${
+                                    fieldErrors.endTime ? 'border-2 border-red-500' : ''
+                                }`}
                             />
                         </div>
                     </>
                 )}
 
                 <div className="flex flex-col mb-4">
-                    <h3 className="text-white font-bold">Total Price: {totalPrice} €</h3>
+                    <h3 className="text-white font-bold">Total Price: £{totalPrice}</h3>
                 </div>
-                <button type="submit" className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                <button
+                    type="submit"
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+                >
                     Create Reservation
                 </button>
             </form>
 
-            {/* Modal Implementation */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-lg shadow-lg w-96">
                         <h2 className="text-2xl font-bold mb-4">Reservation Summary</h2>
                         <p className="mb-4">
-                            Cancellations within 48 hours of the start date will incur the full payment of {totalPrice} €.
+                            Cancellations within 48 hours of the start date will incur the full payment of £{totalPrice}.
                         </p>
                         <p className="mb-4">
-                            A deposit of 30% ({depositAmount} €) is required to complete the reservation.
+                            A deposit of 30% (£{(parseFloat(totalPrice) * 0.3).toFixed(2)}) is required to complete the reservation.
                         </p>
                         <div className="flex justify-end space-x-4">
-                            <button onClick={handleCancelModal} className="bg-gray-300 hover:bg-gray-400 text-black py-2 px-4 rounded">
+                            <button
+                                onClick={handleCancelModal}
+                                className="bg-gray-300 hover:bg-gray-400 text-black py-2 px-4 rounded"
+                            >
                                 Cancel
                             </button>
-                            <button onClick={handleContinue} className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded">
+                            <button
+                                onClick={handleContinue}
+                                className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded"
+                            >
                                 Continue
                             </button>
                         </div>
@@ -260,6 +403,6 @@ function Reservation({ carId, pricePerDay, onReservationSuccess, carMake, carMod
             )}
         </div>
     );
-}
+});
 
 export default Reservation;

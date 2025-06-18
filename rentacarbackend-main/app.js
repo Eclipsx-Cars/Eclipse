@@ -15,12 +15,18 @@ const demoLoginRoutes = require("./routes/demoLogin");
 const jobRoutes = require("./routes/driverJobsRoutes");
 const requestedDriverJobsRouter = require("./routes/requestedDriverJobsRouter");
 const reveiwRoute = require("./routes/reveiwRoute")
+const messageRoutes = require("./routes/messageRoutes");
 
 // Create a new Express application
 const app = express();
 
 //use cors
-app.use(cors());
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 
 // Connect to the MongoDB database
 connectDB();
@@ -28,6 +34,8 @@ connectDB();
 // Use body-parser middleware to parse JSON data
 app.use(bodyParser.json());
 
+//Messages routes
+app.use("/api/messages", messageRoutes);
 // Include user routes
 app.use("/api/users", userRoutes);
 // User auth Route for login

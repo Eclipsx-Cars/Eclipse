@@ -11,7 +11,7 @@ import DriverRegistration from "./components/DriverRegistration";
 import Signin from './components/Signin';
 import Profile from './components/profile';
 import AuthProvider from './context/authContext';
-import DriversDashboard from './components/DriversDashboard';
+import DriverRouter from './DriverRouter';
 
 import DemoLogin from './components/DemoLogin';
 import AdminRouter from "./AdminRouter";
@@ -33,7 +33,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/Adminpanel/*" element={<AdminRouter />} />
-                <Route path="/DriversDashboard" element={<DriversDashboard />} />
+                <Route path="/DriversDashboard/*" element={<DriverRouter />} />
                 <Route path="/About" element={<About />} />
                 <Route path="/Cars" element={<Cars />} />
                 <Route path="/Checkout" element={<CheckoutPage />} />

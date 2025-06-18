@@ -1,6 +1,16 @@
 import React, { Component } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import '../css/Sidebar.css';
-import {FaBars, FaTimes, FaHome, FaBriefcase, FaEnvelope, FaUser, FaCar} from "react-icons/fa";
+import {
+    FaBars,
+    FaTimes,
+    FaHome,
+    FaBriefcase,
+    FaEnvelope,
+    FaUser,
+    FaCar,
+    FaComments
+} from "react-icons/fa";
 
 interface SidebarState {
     isSidebarCollapsed: boolean;
@@ -9,15 +19,17 @@ interface SidebarState {
 
 interface SidebarProps {
     onToggle: (collapsed: boolean) => void;
+    isDriver?: boolean;
 }
 
-interface SidebarState {
-    isSidebarCollapsed: boolean;
-    isMobileView: boolean;
-}
+// Wrapper for useLocation
+const withRouter = (WrappedComponent: any) => (props: any) => {
+    const location = useLocation();
+    return <WrappedComponent {...props} location={location} />;
+};
 
-class Sidebar extends Component<SidebarProps, SidebarState> {
-    constructor(props: SidebarProps) {
+class Sidebar extends Component<SidebarProps & { location: any }, SidebarState> {
+    constructor(props: SidebarProps & { location: any }) {
         super(props);
         this.state = {
             isSidebarCollapsed: false,
@@ -49,50 +61,77 @@ class Sidebar extends Component<SidebarProps, SidebarState> {
     };
 
     render() {
-        const { isSidebarCollapsed, isMobileView } = this.state;
+        const { isSidebarCollapsed } = this.state;
+        const { isDriver } = this.props;
         const buttonIcon = isSidebarCollapsed ? <FaBars /> : <FaTimes />;
 
         return (
             <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
                 {!isSidebarCollapsed && (
                     <div className="sidebar-header">
-                        <h3>Admin Dashboard</h3>
+                        <h3>{isDriver ? 'Driver Dashboard' : 'Admin Dashboard'}</h3>
                     </div>
                 )}
+
                 <ul className="list-unstyled components">
-                    <li>
-                        <a href="/AdminPanel">
-                            {isSidebarCollapsed ? <FaHome /> : 'Admin Home'}
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/AdminPanel/Driverjobs">
-                            {isSidebarCollapsed ? <FaBriefcase /> : 'Driver Jobs'}
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/AdminPanel/Rentalcars">
-                            {isSidebarCollapsed ? <FaCar /> : 'Cars'}
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/AdminPanel/Userpage">
-                            {isSidebarCollapsed ? <FaUser /> : 'Users'}
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/">
-                            {isSidebarCollapsed ? <FaEnvelope /> : 'Driver Messenger'}
-                        </a>
-                    </li>
+                    {isDriver ? (
+                        // Driver Menu Items
+                        <>
+                            <li>
+                                <Link to="/DriversDashboard">
+                                    {isSidebarCollapsed ? (
+                                        <FaBriefcase />
+                                    ) : (
+                                        'Available Jobs'
+                                    )}
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/DriversDashboard/Messages">
+                                    {isSidebarCollapsed ? (
+                                        <FaEnvelope />
+                                    ) : (
+                                        'Messages'
+                                    )}
+                                </Link>
+                            </li>
+                        </>
+                    ) : (
+                        // Admin Menu Items
+                        <>
+                            <li>
+                                <Link to="/AdminPanel">
+                                    {isSidebarCollapsed ? <FaHome /> : 'Admin Home'}
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/AdminPanel/Driverjobs">
+                                    {isSidebarCollapsed ? <FaBriefcase /> : 'Driver Jobs'}
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/AdminPanel/Rentalcars">
+                                    {isSidebarCollapsed ? <FaCar /> : 'Cars'}
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/AdminPanel/Userpage">
+                                    {isSidebarCollapsed ? <FaUser /> : 'Users'}
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/AdminPanel/Messages">
+                                    {isSidebarCollapsed ? <FaComments /> : 'Messages'}
+                                </Link>
+                            </li>
+                        </>
+                    )}
                 </ul>
 
                 <div className="corner-button">
                     <button
                         onClick={this.handleSidebarToggle}
-                        className={`responsive-button ${
-                            isSidebarCollapsed ? 'closed' : 'open'
-                        }`}
+                        className={`responsive-button ${isSidebarCollapsed ? 'closed' : 'open'}`}
                     >
                         {buttonIcon}
                     </button>
@@ -102,4 +141,4 @@ class Sidebar extends Component<SidebarProps, SidebarState> {
     }
 }
 
-export default Sidebar;
+export default withRouter(Sidebar);

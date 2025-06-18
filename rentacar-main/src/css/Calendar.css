@@ -1,0 +1,59 @@
+/* Calendar.css */
+.calendar-container .fc-day {
+    cursor: pointer !important;
+    transition: background-color 0.2s ease;
+}
+
+.calendar-container .fc-day:hover {
+    background-color: rgba(0, 0, 255, 0.1) !important;
+}
+
+.calendar-container .fc-day.selected {
+    background-color: rgba(0, 128, 0, 0.4) !important;
+}
+
+.calendar-container .fc-day-today {
+    background-color: rgba(255, 220, 40, 0.15) !important;
+}
+
+.calendar-container .fc-day-past {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    cursor: not-allowed !important;
+}
+
+.calendar-container .fc {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.calendar-container .fc-button {
+    background-color: #4a5568 !important;
+    border-color: #4a5568 !important;
+}
+
+.calendar-container .fc-button:hover {
+    background-color: #2d3748 !important;
+}
+
+.calendar-container .fc-day-header {
+    background-color: #2d3748;
+    color: white;
+}
+
+.calendar-container .fc-daygrid-day-number {
+    color: #2d3748;
+    font-weight: bold;
+}
+
+.calendar-container .fc-daygrid-day.fc-day-today {
+    background-color: rgba(255, 220, 40, 0.15) !important;
+}
+
+.calendar-day {
+    min-height: 80px !important;
+}
+
+.calendar-container .fc-toolbar-title {
+    color: black !important;
+}

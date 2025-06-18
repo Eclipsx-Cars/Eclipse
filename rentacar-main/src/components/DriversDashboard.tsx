@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import Header from "./header";
 import { AuthContext } from "../context/authContext";
+import Sidebar from "./Sidebar";
+import Messages from "./Messages";
 
 interface Job {
     _id: string;
@@ -9,14 +11,16 @@ interface Job {
     description: string;
     pay: string;
     taken: boolean;
-    acceptedByName?: string; // Optional field for accepted name
-    acceptedByEmail?: string; // Optional field for accepted email
+    acceptedByName?: string;
+    acceptedByEmail?: string;
 }
 
 const DriversDashboard: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
-    const [user, setUser] = useState<{ name: string; email: string; isVerifiedDriver: boolean } | null>(null); // User state with isVerifiedDriver
+    const [user, setUser] = useState<{ name: string; email: string; isVerifiedDriver: boolean } | null>(null);
     const { userId } = useContext(AuthContext);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [currentView, setCurrentView] = useState<'jobs' | 'messages'>('jobs');
 
     const fetchJobs = async () => {
         try {
@@ -35,7 +39,7 @@ const DriversDashboard: React.FC = () => {
         try {
             const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${userId}`);
             if (response.status === 200) {
-                setUser(response.data);  // Ensure isVerifiedDriver is part of the user data
+                setUser(response.data);
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
@@ -54,8 +58,8 @@ const DriversDashboard: React.FC = () => {
                 acceptedByName: user.name,
                 acceptedByEmail: user.email
             });
-            console.log("Job accepted successfully:", response.data); // Log the response data
-            fetchJobs(); // Refresh jobs data after accepting
+            console.log("Job accepted successfully:", response.data);
+            fetchJobs();
         } catch (error) {
             console.error("Error accepting job:", error);
         }
@@ -73,51 +77,53 @@ const DriversDashboard: React.FC = () => {
                 acceptedByName: null,
                 acceptedByEmail: null
             });
-            console.log("Job cancelled successfully:", response.data); // Log the response data
-            fetchJobs(); // Refresh jobs data after cancelling
+            console.log("Job cancelled successfully:", response.data);
+            fetchJobs();
         } catch (error) {
             console.error("Error cancelling job:", error);
         }
     };
 
+    const handleSidebarToggle = (collapsed: boolean) => {
+        setIsSidebarCollapsed(collapsed);
+    };
+
     useEffect(() => {
         fetchJobs();
-        fetchUser(); // Fetch user information on component mount
-    }, []);
+        fetchUser();
+    }, [userId]);
 
-    return (
-        <div className="container mx-auto mt-20">
-            <Header />
-            <h1 className="text-3xl font-bold text-center">Drivers Dashboard</h1>
+    const renderJobsContent = () => (
+        <div className="container mx-auto p-4">
+            <h1 className="text-3xl font-bold text-center text-white mb-6">Available Jobs</h1>
 
-            {/* Check if the user is a verified driver */}
             {user && !user.isVerifiedDriver ? (
-                <div className="text-center mt-10">
-                    <h2 className="text-xl font-bold">Please email the following to example@email.com:</h2>
-                    <ul className="list-disc list-inside mt-4">
+                <div className="text-center mt-10 bg-gray-700 p-6 rounded-lg">
+                    <h2 className="text-xl font-bold text-white mb-4">Please email the following to example@email.com:</h2>
+                    <ul className="list-disc list-inside mt-4 text-white">
                         <li>Full Name</li>
                         <li>Email</li>
                         <li>Front and Back of Licence</li>
                     </ul>
                 </div>
             ) : (
-                <div className="overflow-x-auto mt-10">
-                    <table className="min-w-full bg-white">
-                        <thead>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full bg-gray-700 rounded-lg overflow-hidden">
+                        <thead className="bg-gray-800">
                         <tr>
-                            <th className="py-2 px-4 border-b">Title</th>
-                            <th className="py-2 px-4 border-b">Description</th>
-                            <th className="py-2 px-4 border-b">Pay</th>
-                            <th className="py-2 px-4 border-b">Actions</th>
+                            <th className="py-3 px-4 text-white">Title</th>
+                            <th className="py-3 px-4 text-white">Description</th>
+                            <th className="py-3 px-4 text-white">Pay</th>
+                            <th className="py-3 px-4 text-white">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
                         {jobs.map((job: Job) => (
-                            <tr key={job._id}>
-                                <td className="py-2 px-4 border-b">{job.title}</td>
-                                <td className="py-2 px-4 border-b">{job.description}</td>
-                                <td className="py-2 px-4 border-b">{job.pay}</td>
-                                <td className="py-2 px-4 border-b">
+                            <tr key={job._id} className="border-b border-gray-600">
+                                <td className="py-3 px-4 text-white">{job.title}</td>
+                                <td className="py-3 px-4 text-white">{job.description}</td>
+                                <td className="py-3 px-4 text-white">{job.pay}</td>
+                                <td className="py-3 px-4">
                                     {!job.taken ? (
                                         <button
                                             onClick={() => acceptJob(job._id)}
@@ -133,7 +139,7 @@ const DriversDashboard: React.FC = () => {
                                             Cancel
                                         </button>
                                     ) : (
-                                        <span>Accepted by {job.acceptedByName}</span>
+                                        <span className="text-white">Accepted by {job.acceptedByName}</span>
                                     )}
                                 </td>
                             </tr>
@@ -142,6 +148,44 @@ const DriversDashboard: React.FC = () => {
                     </table>
                 </div>
             )}
+        </div>
+    );
+
+    return (
+        <div className="flex min-h-screen bg-gray-800">
+            <Sidebar onToggle={handleSidebarToggle} isDriver={true} />
+            <div className={`flex-1 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
+                <Header sidebarCollapsed={isSidebarCollapsed}/>
+                <div className="p-4">
+                    <nav className="mb-4">
+                        <div className="flex space-x-4">
+                            <button
+                                onClick={() => setCurrentView('jobs')}
+                                className={`px-4 py-2 rounded-lg ${
+                                    currentView === 'jobs'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                            >
+                                Jobs
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('messages')}
+                                className={`px-4 py-2 rounded-lg ${
+                                    currentView === 'messages'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                            >
+                                Messages
+                            </button>
+                        </div>
+                    </nav>
+
+                    {currentView === 'jobs' && renderJobsContent()}
+                    {currentView === 'messages' && <Messages />}
+                </div>
+            </div>
         </div>
     );
 };
