@@ -21,9 +21,9 @@ const CarSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  imageUrl: {
+  images: [{
     type: String,
-  },
+  }],
   CarForReason: {
     type: String,
     enum: ['MusicVideo', 'Chauffeur'],

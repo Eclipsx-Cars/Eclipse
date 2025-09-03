@@ -1,9 +1,7 @@
 require("dotenv").config();
 const config = require("../utils/config");
-const { MongoClient } = require("mongodb");
 const mongodb = require("mongodb");
 const mongoose = require("mongoose");
-const { Readable } = require("stream");
 const express = require("express");
 const router = express.Router();
 const Car = require("../models/car");
@@ -17,7 +15,7 @@ const storage = new GridFsStorage({
   file: (req, file) => {
     return {
       filename: `${Date.now()}-${file.originalname}`,
-      bucketName: "uploads.files",
+      bucketName: "uploads.files"  // This matches your collection name
     };
   },
 });
@@ -30,9 +28,7 @@ router.get("/", async (req, res) => {
     const cars = await Car.find({});
     res.status(200).json(cars);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "An error occurred while retrieving cars.", error });
+    res.status(500).json({ message: "An error occurred while retrieving cars.", error });
   }
 });
 
@@ -46,23 +42,18 @@ router.get("/:carId", async (req, res) => {
     }
     res.status(200).json(car);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "An error occurred while retrieving the car.", error });
+    res.status(500).json({ message: "An error occurred while retrieving the car.", error });
   }
 });
 
-// Add a car
-router.post("/", upload.single("image"), async (req, res) => {
+// Add a car with images
+router.post("/", upload.array("images"), async (req, res) => {
   try {
-    const { make, model, year, description, price, CarForReason} = req.body;
-    const image = req.file;
+    const { make, model, year, description, price, CarForReason } = req.body;
+    const files = req.files;
 
-    console.log("Image file received: ", image);
     if (!make || !model || !year) {
-      return res
-        .status(400)
-        .json({ message: "Please provide all required fields." });
+      return res.status(400).json({ message: "Please provide all required fields." });
     }
 
     const newCar = new Car({
@@ -71,32 +62,25 @@ router.post("/", upload.single("image"), async (req, res) => {
       year,
       description,
       price,
-      CarForReason
+      CarForReason,
+      images: files ? files.map(file => `/api/cars/image/${file.filename}`) : []
     });
 
-    if (image) {
-      newCar.imageUrl = `/api/cars/image/${image.filename}`;
-    }
-
-    console.log("New car instance: ", newCar);
     await newCar.save();
-
     res.status(201).json({ message: "Car added successfully.", car: newCar });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "An error occurred while adding the car.", error });
+    res.status(500).json({ message: "An error occurred while adding the car.", error });
   }
 });
 
-// Edit a car
-router.put("/:carId", async (req, res) => {
+// Update car details and images
+router.put("/:carId", upload.array("images"), async (req, res) => {
   try {
     const { carId } = req.params;
     const { make, model, year, description, price, CarForReason } = req.body;
+    const files = req.files;
 
     const car = await Car.findById(carId);
-
     if (!car) {
       return res.status(404).json({ message: "Car not found." });
     }
@@ -108,90 +92,93 @@ router.put("/:carId", async (req, res) => {
     if (price) car.price = price;
     if (CarForReason) car.CarForReason = CarForReason;
 
-    await car.save();
+    if (files && files.length > 0) {
+      if (car.images && car.images.length > 0) {
+        const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+          bucketName: "uploads.files"
+        });
 
+        for (const imageUrl of car.images) {
+          const oldImageFilename = imageUrl.split("/").pop();
+          try {
+            const oldFile = await bucket.find({ filename: oldImageFilename }).toArray();
+            if (oldFile.length > 0) {
+              await bucket.delete(oldFile[0]._id);
+            }
+          } catch (error) {
+            console.error("Error deleting old image:", error);
+          }
+        }
+      }
+      car.images = files.map(file => `/api/cars/image/${file.filename}`);
+    }
+
+    await car.save();
     res.status(200).json({ message: "Car updated successfully.", car });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "An error occurred while updating the car.", error });
+    res.status(500).json({ message: "Error updating car.", error });
   }
 });
 
-// Remove a car
+// Delete a car
 router.delete("/:carId", async (req, res) => {
-  console.log("DELETE request received:", req.params);
   try {
     const { carId } = req.params;
-
     const car = await Car.findById(carId);
 
     if (!car) {
-      console.log("Car not found:", carId);
       return res.status(404).json({ message: "Car not found." });
     }
 
-    await Car.deleteOne({ _id: carId });
+    if (car.images && car.images.length > 0) {
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: "uploads.files"
+      });
 
-    console.log("Car removed successfully:", carId);
+      for (const imageUrl of car.images) {
+        const imageFilename = imageUrl.split("/").pop();
+        try {
+          const file = await bucket.find({ filename: imageFilename }).toArray();
+          if (file.length > 0) {
+            await bucket.delete(file[0]._id);
+          }
+        } catch (error) {
+          console.error("Error deleting image:", error);
+        }
+      }
+    }
+
+    await Car.findByIdAndDelete(carId);
     res.status(200).json({ message: "Car removed successfully." });
   } catch (error) {
-    console.error("Error while removing the car:", error);
-    res
-      .status(500)
-      .json({ message: "An error occurred while removing the car.", error });
+    res.status(500).json({ message: "Error deleting car.", error });
   }
 });
 
+// Get image by filename
 router.get("/image/:filename", async (req, res) => {
   const filename = req.params.filename;
-  console.log(`Image requested: ${filename}`);
-
-  const db = mongoose.connection.db; // Use the existing connection
-  const bucket = new mongoose.mongo.GridFSBucket(db, {
-    bucketName: "uploads.files",
-  });
-
   try {
-    console.log("Finding the file in the bucket.");
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: "uploads.files"
+    });
+
     const files = await bucket.find({ filename }).toArray();
-    console.log("Files found:", files);
 
     if (!files || files.length === 0) {
-      console.log(`Image not found: ${filename}`);
       return res.status(404).json({ message: "Image not found." });
     }
 
-    console.log(`Found file: ${JSON.stringify(files[0])}`);
-
-    if (
-      files[0].contentType === "image/jpeg" ||
-      files[0].contentType === "image/png"
-    ) {
-      const readStream = bucket.openDownloadStreamByName(filename);
-      readStream.pipe(res);
-      readStream.on("error", (err) => {
-        console.log(`Error streaming the image: ${err}`);
-        res.status(500).json({
-          message: "An error occurred while streaming the image.",
-          error: err,
-        });
-      });
-      readStream.on("finish", () => {
-        console.log(`Image streamed: ${filename}`);
-      });
+    if (files[0].contentType.startsWith('image/')) {
+      res.set('Content-Type', files[0].contentType);
+      const downloadStream = bucket.openDownloadStreamByName(filename);
+      downloadStream.pipe(res);
     } else {
-      console.log(
-        `Unsupported content type: ${files[0].contentType}, filename: ${filename}`
-      );
-      res.status(404).json({ message: "Image not found." });
+      res.status(404).json({ message: "Not an image." });
     }
-  } catch (err) {
-    console.log(`Error retrieving the image: ${err}`);
-    return res.status(500).json({
-      message: "An error occurred while retrieving the image.",
-      error: err,
-    });
+  } catch (error) {
+    console.error('Error retrieving image:', error);
+    res.status(500).json({ message: "Error retrieving image.", error });
   }
 });
 

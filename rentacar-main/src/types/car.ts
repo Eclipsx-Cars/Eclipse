@@ -6,6 +6,5 @@ export interface Car {
     description: string;
     price: string;
     CarForReason: string;
-    imageUrl?: string;
     images: string[];
 }

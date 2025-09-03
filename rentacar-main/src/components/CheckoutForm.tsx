@@ -6,7 +6,6 @@ import {
     useStripe,
     useElements,
 } from "@stripe/react-stripe-js";
-import '../css/CheckoutPage.css';
 import { AuthContext } from "../context/authContext";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +17,8 @@ interface Car {
     year: number;
     description: string;
     price: string;
-    imageUrl: string;
+    CarForReason: string;
+    images: string[];
 }
 
 interface CheckoutFormProps {
@@ -27,10 +27,10 @@ interface CheckoutFormProps {
     carId: string;
     carMake: string;
     carModel: string;
-    startDate: string;  // Assuming startDate is a string (e.g., '2024-10-16')
-    endDate: string;    // Assuming endDate is a string (e.g., '2024-10-17')
-    startTime?: string; // Optional start time
-    endTime?: string;   // Optional end time
+    startDate: string;
+    endDate: string;
+    startTime?: string;
+    endTime?: string;
 }
 
 const CheckoutForm: React.FC<CheckoutFormProps> = ({
@@ -41,8 +41,8 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
                                                        carModel,
                                                        startDate,
                                                        endDate,
-                                                       startTime, // Receive startTime as a prop
-                                                       endTime    // Receive endTime as a prop
+                                                       startTime,
+                                                       endTime
                                                    }) => {
     const stripe = useStripe();
     const elements = useElements();
@@ -51,9 +51,13 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
     const [email, setEmail] = useState("");
     const [car, setCar] = useState<Car | null>(null);
-    const [country, setCountry] = useState("GB"); // Set a default value for country
+    const [country, setCountry] = useState("GB");
     const [postalCode, setPostalCode] = useState("");
-    const [errorMessage, setErrorMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState("");
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    const depositAmountFixed = Math.round(depositAmount * 100) / 100;
 
     const countryList = [
         { code: 'GB', name: 'United Kingdom' },
@@ -61,50 +65,90 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
         { code: 'CA', name: 'Canada' },
         { code: 'AU', name: 'Australia' },
         { code: 'FR', name: 'France' },
+        { code: 'DE', name: 'Germany' },
+        { code: 'IT', name: 'Italy' },
+        { code: 'ES', name: 'Spain' },
+        { code: 'NL', name: 'Netherlands' },
+        { code: 'IE', name: 'Ireland' }
     ];
 
-    const depositAmountFixed = Math.round(depositAmount * 100) / 100; // Rounded deposit amount
-    const remainingToPay = Math.round((totalPrice - depositAmount) * 100) / 100; // Adjusted remaining to pay
+    const cardStyle = {
+        style: {
+            base: {
+                color: '#ffffff',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '16px',
+                '::placeholder': {
+                    color: '#aab7c4',
+                },
+            },
+            invalid: {
+                color: '#fa755a',
+                iconColor: '#fa755a',
+            },
+        },
+    };
 
     useEffect(() => {
         const fetchCar = async () => {
             try {
-                const response = await axios.get(
-                    `${process.env.REACT_APP_API_URL}/api/cars/${carId}`
-                );
+                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/cars/${carId}`);
                 setCar(response.data);
             } catch (error) {
                 console.error(`Error fetching car with ID ${carId}:`, error);
+                setErrorMessage("Error loading car details");
             }
         };
 
         fetchCar();
     }, [carId]);
 
+    const nextImage = () => {
+        if (car?.images?.length) {
+            setCurrentImageIndex((prev) => (prev + 1) % car.images.length);
+        }
+    };
+
+    const previousImage = () => {
+        if (car?.images?.length) {
+            setCurrentImageIndex((prev) =>
+                prev === 0 ? car.images.length - 1 : prev - 1
+            );
+        }
+    };
+
+    const getCurrentImage = () => {
+        return car?.images?.[currentImageIndex] ?? null;
+    };
+
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        setErrorMessage("");
+        setIsProcessing(true);
 
         if (!stripe || !elements) {
-            setErrorMessage("Stripe.js has not loaded yet.");
+            setErrorMessage("Payment system is not ready yet.");
+            setIsProcessing(false);
             return;
         }
 
         const cardNumberElement = elements.getElement(CardNumberElement);
         if (!cardNumberElement) {
-            console.error("Card Elements not found");
+            setErrorMessage("Card information is missing.");
+            setIsProcessing(false);
             return;
         }
 
-        // Ensure the country field is set before processing
-        if (!country) {
-            setErrorMessage("Please select a country.");
+        if (!email || !country || !postalCode) {
+            setErrorMessage("Please fill in all required fields.");
+            setIsProcessing(false);
             return;
         }
 
         try {
             const paymentIntentResponse = await axios.post(
                 `${process.env.REACT_APP_API_URL}/api/reservations/create-payment-intent`,
-                { amount: depositAmountFixed * 100, currency: "gbp" } // Amount in pence
+                { amount: depositAmountFixed * 100, currency: "gbp" }
             );
 
             const { client_secret } = paymentIntentResponse.data;
@@ -113,127 +157,229 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
                 payment_method: {
                     card: cardNumberElement,
                     billing_details: {
-                        email: email,
-                        address: { postal_code: postalCode, country: country }, // Ensure country is passed
+                        email,
+                        address: { postal_code: postalCode, country }
                     },
                 },
             });
 
             if (error) {
-                console.error("Payment failed:", error);
-                setErrorMessage("Payment failed. Please check your card details.");
+                setErrorMessage(error.message || "Payment failed");
+                setIsProcessing(false);
                 return;
             }
 
-            if (paymentIntent && paymentIntent.status === "succeeded") {
+            if (paymentIntent?.status === "succeeded") {
                 try {
-                    // Prepare reservation data
-                    const reservationData: any = {
+                    const reservationData = {
                         user: userId,
                         carId,
                         carMake,
                         carModel,
                         startDate,
-                        endDate,
+                        endDate: startTime && endTime ? startDate : endDate,
+                        startTime,
+                        endTime,
                         totalPrice,
-                        currentPaid: depositAmountFixed, // Set currentPaid to the deposit amount
-                        remainingToPay, // Calculate remainingToPay based on totalPrice - currentPaid
+                        currentPaid: depositAmountFixed,
+                        remainingToPay: totalPrice - depositAmountFixed
                     };
-
-                    // If startTime and endTime are present, adjust the reservation data
-                    if (startTime && endTime) {
-                        reservationData.startTime = startTime;
-                        reservationData.endTime = endTime;
-
-                        // Set endDate to be the same as startDate
-                        reservationData.endDate = startDate;
-                    }
 
                     await axios.post(
                         `${process.env.REACT_APP_API_URL}/api/reservations`,
                         reservationData
                     );
-                    window.alert("Reservation has been made. You can see all your reservations on your profile page.");
-                    navigate("/");
+
+                    navigate("/reservation-confirmation", {
+                        state: {
+                            success: true,
+                            amount: depositAmountFixed,
+                            carDetails: `${carMake} ${carModel}`,
+                            reservationDetails: reservationData
+                        }
+                    });
                 } catch (error) {
-                    console.error("Error creating reservation:", error);
-                    setErrorMessage("An error occurred during reservation creation.");
+                    setErrorMessage("Reservation failed. Please contact support.");
+                    console.error("Reservation error:", error);
                 }
             }
         } catch (error) {
-            console.error(error);
-            setErrorMessage("An error occurred during payment processing.");
+            setErrorMessage("Payment processing failed. Please try again.");
+            console.error("Payment error:", error);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     return (
-        <div className="checkout-container">
-            <div className="checkout-form">
-                <div className="product-details">
-                    <div className="product-name">{`${car?.make} ${carModel}`}</div>
-                    <img src={`${process.env.REACT_APP_API_URL}${car?.imageUrl || ''}`} alt="Product"
-                         className="product-image" />
-                    <div className="product-price">£{depositAmountFixed}</div>
+        <div className="max-w-4xl mx-auto p-4 bg-gray-800 rounded-lg shadow-xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                    <div className="bg-gray-700 p-4 rounded-lg">
+                        <h2 className="text-xl font-bold text-white mb-4">Order Summary</h2>
+                        {car && (
+                            <div className="relative">
+                                {car.images && car.images.length > 0 ? (
+                                    <>
+                                        <img
+                                            src={`${process.env.REACT_APP_API_URL}${getCurrentImage()}`}
+                                            alt={`${carMake} ${carModel}`}
+                                            className="w-full h-64 object-cover rounded-lg"
+                                        />
+                                        {car.images.length > 1 && (
+                                            <>
+                                                <div className="absolute inset-0 flex items-center justify-between">
+                                                    <button
+                                                        onClick={previousImage}
+                                                        className="bg-black bg-opacity-50 text-white rounded-full p-2 mx-2 hover:bg-opacity-75"
+                                                    >
+                                                        ←
+                                                    </button>
+                                                    <button
+                                                        onClick={nextImage}
+                                                        className="bg-black bg-opacity-50 text-white rounded-full p-2 mx-2 hover:bg-opacity-75"
+                                                    >
+                                                        →
+                                                    </button>
+                                                </div>
+                                                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                                    {car.images.map((_, index) => (
+                                                        <button
+                                                            key={index}
+                                                            onClick={() => setCurrentImageIndex(index)}
+                                                            className={`w-2 h-2 rounded-full transition-colors ${
+                                                                index === currentImageIndex
+                                                                    ? 'bg-white'
+                                                                    : 'bg-gray-400'
+                                                            }`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="w-full h-48 bg-gray-600 flex items-center justify-center rounded-lg">
+                                        <span className="text-gray-400">No image available</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="space-y-2 text-white mt-4">
+                            <p className="text-lg font-semibold">{`${carMake} ${carModel}`}</p>
+                            <div className="flex justify-between">
+                                <span>Total Price:</span>
+                                <span>£{totalPrice}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Deposit Amount:</span>
+                                <span>£{depositAmountFixed}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-300">
+                                <span>Remaining to Pay:</span>
+                                <span>£{(totalPrice - depositAmountFixed).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <form onSubmit={handleSubmit} className="checkout-form">
-                <h3>REVIEW ORDER</h3>
-                <div className="form-group">
-                    <label htmlFor="email">Email</label>
-                    <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="country">Country</label>
-                    <select
-                        id="country"
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                        required
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <h2 className="text-xl font-bold text-white">Payment Details</h2>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-2"
+                                required
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Country
+                                </label>
+                                <select
+                                    value={country}
+                                    onChange={(e) => setCountry(e.target.value)}
+                                    className="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-2"
+                                    required
+                                >
+                                    {countryList.map((country) => (
+                                        <option key={country.code} value={country.code}>
+                                            {country.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Postal Code
+                                </label>
+                                <input
+                                    type="text"
+                                    value={postalCode}
+                                    onChange={(e) => setPostalCode(e.target.value)}
+                                    className="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-2"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Card Number
+                                </label>
+                                <div className="bg-gray-700 border border-gray-600 rounded-md p-2">
+                                    <CardNumberElement options={cardStyle} />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        Expiry Date
+                                    </label>
+                                    <div className="bg-gray-700 border border-gray-600 rounded-md p-2">
+                                        <CardExpiryElement options={cardStyle} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        CVC
+                                    </label>
+                                    <div className="bg-gray-700 border border-gray-600 rounded-md p-2">
+                                        <CardCvcElement options={cardStyle} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {errorMessage && (
+                        <div className="bg-red-500 text-white p-3 rounded-md">
+                            {errorMessage}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={!stripe || !elements || isProcessing}
+                        className={`w-full bg-blue-600 text-white py-3 px-4 rounded-md font-semibold
+                            ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}
+                            transition-colors duration-200`}
                     >
-                        {countryList.map((country) => (
-                            <option key={country.code} value={country.code}>
-                                {country.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="form-group">
-                    <label htmlFor="postalCode">Postal Code</label>
-                    <input
-                        type="text"
-                        id="postalCode"
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="cardNumberElement">Card Number</label>
-                    <CardNumberElement id="cardNumberElement" />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="expiryElement">Expiry Date</label>
-                    <CardExpiryElement id="expiryElement" />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="CVCElement">CVC</label>
-                    <CardCvcElement id="CVCElement" />
-                </div>
-                <button
-                    type="submit"
-                    className="btn btn-primary checkout-button"
-                    disabled={!stripe || !elements}
-                >
-                    Pay {depositAmountFixed} GBP
-                </button>
-            </form>
-            {errorMessage && <p className="error-message">{errorMessage}</p>}
+                        {isProcessing ? 'Processing...' : `Pay £${depositAmountFixed}`}
+                    </button>
+                </form>
+            </div>
         </div>
     );
 };

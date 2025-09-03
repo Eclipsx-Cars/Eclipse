@@ -1,7 +1,6 @@
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import { CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import axios from "axios";
-import '../css/CheckoutPage.css';
 import Header from "./header";
 import Footer from "./Footer";
 
@@ -21,15 +20,42 @@ interface Car {
     year: number;
     description: string;
     price: string;
-    imageUrl: string;
+    CarForReason: string;
+    images: string[];
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ reservationId, remainingToPay, onPaymentSuccess, carMake, carModel, carId }) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({
+                                                     reservationId,
+                                                     remainingToPay,
+                                                     onPaymentSuccess,
+                                                     carMake,
+                                                     carModel,
+                                                     carId
+                                                 }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [email, setEmail] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [car, setCar] = useState<Car | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    const cardStyle = {
+        style: {
+            base: {
+                color: '#ffffff',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '16px',
+                '::placeholder': {
+                    color: '#aab7c4',
+                },
+            },
+            invalid: {
+                color: '#fa755a',
+                iconColor: '#fa755a',
+            },
+        },
+    };
 
     useEffect(() => {
         const fetchCar = async () => {
@@ -40,124 +66,222 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ reservationId, remainingToPay
                 setCar(response.data);
             } catch (error) {
                 console.error(`Error fetching car with ID ${carId}:`, error);
+                setErrorMessage("Error loading car details");
             }
         };
 
         fetchCar();
     }, [carId]);
 
-    const handleSubmit = async (event: { preventDefault: () => void }) => {
+    const nextImage = () => {
+        if (car?.images?.length) {
+            setCurrentImageIndex((prev) => (prev + 1) % car.images.length);
+        }
+    };
+
+    const previousImage = () => {
+        if (car?.images?.length) {
+            setCurrentImageIndex((prev) =>
+                prev === 0 ? car.images.length - 1 : prev - 1
+            );
+        }
+    };
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        setErrorMessage("");
+        setIsProcessing(true);
 
         if (!stripe || !elements) {
-            setErrorMessage("Stripe.js has not loaded yet.");
+            setErrorMessage("Payment system is not ready yet.");
+            setIsProcessing(false);
             return;
         }
 
         const cardNumberElement = elements.getElement(CardNumberElement);
         if (!cardNumberElement) {
-            console.error("Card Elements not found");
+            setErrorMessage("Card information is missing.");
+            setIsProcessing(false);
+            return;
+        }
+
+        if (!email) {
+            setErrorMessage("Please provide an email address.");
+            setIsProcessing(false);
             return;
         }
 
         try {
-            // Create the payment intent
             const paymentIntentResponse = await axios.post(
                 `${process.env.REACT_APP_API_URL}/api/reservations/${reservationId}/pay`,
                 {
-                    amount: remainingToPay * 100, // Amount in cents for this transaction
+                    amount: Math.round(remainingToPay * 100),
                 }
             );
 
             const { client_secret } = paymentIntentResponse.data;
 
-            // Confirm the card payment
             const { error, paymentIntent } = await stripe.confirmCardPayment(client_secret, {
                 payment_method: {
                     card: cardNumberElement,
-                    billing_details: {
-                        email: email,
-                    },
+                    billing_details: { email },
                 },
             });
 
             if (error) {
-                console.error("Payment failed:", error);
-                setErrorMessage("Payment failed. Please check your card details.");
+                setErrorMessage(error.message || "Payment failed. Please check your card details.");
                 return;
             }
 
-            if (paymentIntent && paymentIntent.status === "succeeded") {
+            if (paymentIntent?.status === "succeeded") {
                 try {
-                    // Send only the amount being paid for this transaction
                     await axios.put(
                         `${process.env.REACT_APP_API_URL}/api/reservations/${reservationId}`,
-                        {
-                            currentPaid: remainingToPay, // Only send the amount paid in this transaction
-                        }
+                        { currentPaid: remainingToPay }
                     );
-
                     onPaymentSuccess();
                 } catch (error) {
+                    setErrorMessage("Payment successful but failed to update reservation. Please contact support.");
                     console.error("Error updating reservation:", error);
-                    setErrorMessage("Error updating reservation. Please try again.");
                 }
             }
         } catch (error) {
+            setErrorMessage("Payment processing failed. Please try again.");
             console.error("Error processing payment:", error);
-            setErrorMessage("Error processing payment. Please try again.");
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     return (
-        <>
+        <div className="min-h-screen bg-gray-900">
             <Header />
-            <div className="fit-content">
-                <div className="checkout-container">
-                    <div className="checkout-form">
-                        <div className="product-details">
-                            <div className="product-name">{`${carMake} ${carModel}`}</div>
-                            <img src={`${process.env.REACT_APP_API_URL}${car?.imageUrl || ''}`} alt="Product"
-                                 className="product-image"/>
-                            <div className="product-price">To Pay Today: £{remainingToPay}</div>
+            <div className="max-w-4xl mx-auto p-4">
+                <div className="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
+                        <div className="space-y-6">
+                            <div className="bg-gray-700 p-4 rounded-lg">
+                                <h2 className="text-xl font-bold text-white mb-4">Payment Details</h2>
+                                <div className="relative h-64 mb-4">
+                                    {car?.images?.length ? (
+                                        <>
+                                            <img
+                                                src={`${process.env.REACT_APP_API_URL}${car.images[currentImageIndex]}`}
+                                                alt={`${carMake} ${carModel}`}
+                                                className="w-full h-full object-cover rounded-lg"
+                                            />
+                                            {car.images.length > 1 && (
+                                                <>
+                                                    <div className="absolute inset-0 flex items-center justify-between p-2">
+                                                        <button
+                                                            onClick={previousImage}
+                                                            className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"
+                                                        >
+                                                            ←
+                                                        </button>
+                                                        <button
+                                                            onClick={nextImage}
+                                                            className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"
+                                                        >
+                                                            →
+                                                        </button>
+                                                    </div>
+                                                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                                        {car.images.map((_, index) => (
+                                                            <button
+                                                                key={index}
+                                                                onClick={() => setCurrentImageIndex(index)}
+                                                                className={`w-2 h-2 rounded-full ${
+                                                                    index === currentImageIndex
+                                                                        ? 'bg-white'
+                                                                        : 'bg-gray-400'
+                                                                }`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-600 rounded-lg flex items-center justify-center">
+                                            <span className="text-gray-400">No image available</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-white space-y-2">
+                                    <h3 className="text-lg font-semibold">{`${carMake} ${carModel}`}</h3>
+                                    <div className="text-2xl font-bold">
+                                        Amount to Pay: £{remainingToPay.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        Email
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full bg-gray-700 text-white border border-gray-600 rounded-md p-2"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        Card Number
+                                    </label>
+                                    <div className="bg-gray-700 border border-gray-600 rounded-md p-2">
+                                        <CardNumberElement options={cardStyle} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                                            Expiry Date
+                                        </label>
+                                        <div className="bg-gray-700 border border-gray-600 rounded-md p-2">
+                                            <CardExpiryElement options={cardStyle} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                                            CVC
+                                        </label>
+                                        <div className="bg-gray-700 border border-gray-600 rounded-md p-2">
+                                            <CardCvcElement options={cardStyle} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {errorMessage && (
+                                <div className="bg-red-500 text-white p-3 rounded-md">
+                                    {errorMessage}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={!stripe || !elements || isProcessing}
+                                className={`w-full bg-blue-600 text-white py-3 px-4 rounded-md font-semibold
+                                    ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}
+                                    transition-colors duration-200`}
+                            >
+                                {isProcessing ? 'Processing...' : `Pay £${remainingToPay.toFixed(2)}`}
+                            </button>
+                        </form>
                     </div>
-                    <form onSubmit={handleSubmit}
-                          className="checkout-form"> {/* Use the same form class as CheckoutForm */}
-                        <div className="form-group">
-                            <label htmlFor="email">Email</label>
-                            <input
-                                type="email"
-                                id="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="cardNumberElement">Card Number</label>
-                            <CardNumberElement id="cardNumberElement"/>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="expiryElement">Expiry Date</label>
-                            <CardExpiryElement id="expiryElement"/>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="CVCElement">CVC</label>
-                            <CardCvcElement id="CVCElement"/>
-                        </div>
-                        <button
-                            type="submit"
-                            className="btn btn-primary checkout-button"
-                            disabled={!stripe || !elements}
-                        >
-                            Pay £{(remainingToPay).toFixed(2)} {/* Display the amount in GBP */}
-                        </button>
-                    </form>
-                    {errorMessage && <p className="error-message">{errorMessage}</p>} {/* Display error messages */}
                 </div>
             </div>
-        </>
+            <Footer />
+        </div>
     );
 };
 

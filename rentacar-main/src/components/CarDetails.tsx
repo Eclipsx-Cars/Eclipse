@@ -14,7 +14,7 @@ interface Car {
     description: string;
     price: string;
     CarForReason: string;
-    imageUrl: string;
+    images: string[]; // Changed from imageUrl to images array
 }
 
 const CarDetails = () => {
@@ -22,6 +22,7 @@ const CarDetails = () => {
     const [car, setCar] = useState<Car | null>(null);
     const [updateCalendar, setUpdateCalendar] = useState(false);
     const [isMultiDay, setIsMultiDay] = useState(true);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const reservationRef = useRef<any>(null);
 
     useEffect(() => {
@@ -53,6 +54,20 @@ const CarDetails = () => {
         setIsMultiDay(isMultiDay);
     };
 
+    const nextImage = () => {
+        if (car.images && car.images.length > 0) {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % car.images.length);
+        }
+    };
+
+    const previousImage = () => {
+        if (car.images && car.images.length > 0) {
+            setCurrentImageIndex((prevIndex) =>
+                prevIndex === 0 ? car.images.length - 1 : prevIndex - 1
+            );
+        }
+    };
+
     const pricePerHour = car.CarForReason === "chauffeur"
         ? (Number(car.price) / 6).toFixed(2)
         : car.price;
@@ -60,13 +75,52 @@ const CarDetails = () => {
     return (
         <div>
             <Header />
-            <div className="bg-gray-100 rounded-lg overflow-hidden justify-center shadow-lg mt-10 my-8 md:mx-0 md:my-0 ">
+            <div className="bg-gray-100 rounded-lg overflow-hidden justify-center shadow-lg mt-10 my-8 md:mx-0 md:my-0">
                 <div className="relative">
-                    <img
-                        src={`${process.env.REACT_APP_API_URL}${car.imageUrl}`}
-                        alt={`${car.make} ${car.model}`}
-                        className="h-auto w-full object-cover max-h-screen max-h-3/4"
-                    />
+                    {car.images && car.images.length > 0 ? (
+                        <>
+                            <img
+                                src={`${process.env.REACT_APP_API_URL}${car.images[currentImageIndex]}`}
+                                alt={`${car.make} ${car.model}`}
+                                className="h-auto w-full object-cover max-h-screen max-h-3/4"
+                            />
+                            {car.images.length > 1 && (
+                                <div className="absolute inset-0 flex items-center justify-between p-4">
+                                    <button
+                                        onClick={previousImage}
+                                        className="bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-75 transition-all"
+                                    >
+                                        ←
+                                    </button>
+                                    <button
+                                        onClick={nextImage}
+                                        className="bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-75 transition-all"
+                                    >
+                                        →
+                                    </button>
+                                </div>
+                            )}
+                            {car.images.length > 1 && (
+                                <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-2">
+                                    {car.images.map((_, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => setCurrentImageIndex(index)}
+                                            className={`w-3 h-3 rounded-full ${
+                                                index === currentImageIndex
+                                                    ? 'bg-white'
+                                                    : 'bg-gray-400'
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="h-64 flex items-center justify-center bg-gray-200">
+                            No images available
+                        </div>
+                    )}
                     <h1 className="absolute bottom-0 left-0 right-0 text-2xl lg:text-6xl font-bold px-4 py-2 bg-gray-900 text-center text-white opacity-90">
                         {`${car.make} ${car.model}`}
                     </h1>
